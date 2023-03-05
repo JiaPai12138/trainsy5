@@ -14,6 +14,7 @@ import shutil
 import time
 from itertools import repeat
 from multiprocessing.pool import Pool, ThreadPool
+from multiprocessing import Value
 from pathlib import Path
 from threading import Thread
 from urllib.parse import urlparse
@@ -435,6 +436,8 @@ class LoadImagesAndLabels(Dataset):
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations() if augment else None
+        self.is_finetune = Value('d', 0.0)
+        self.stronger = Value('d', 0.0)
 
         try:
             f = []  # image files
@@ -595,6 +598,17 @@ class LoadImagesAndLabels(Dataset):
 
     def __getitem__(self, index):
         index = self.indices[index]  # linear, shuffled, or image_weights
+
+        if self.stronger.value > 0:
+            if self.hyp['mosaic'] < 0.5:
+                self.hyp['mosaic'] = 0.5
+                # print('Stronger mosaic !!!')
+
+        if self.is_finetune.value > 0:
+            if self.mosaic or self.augment:
+                self.mosaic = False
+                self.augment = False
+                # print('Disable augment from now !!!')
 
         hyp = self.hyp
         mosaic = self.mosaic and random.random() < hyp['mosaic']

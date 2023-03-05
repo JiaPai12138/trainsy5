@@ -117,14 +117,15 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
 
         LOGGER.info(f'\n{prefix} starting export with onnx {onnx.__version__}...')
         f = file.with_suffix('.onnx')
+        f0 = str(f).replace('best', f'best_{size}')
 
         torch.onnx.export(
             model.cpu() if dynamic else model,  # --dynamic only compatible with cpu
             im.cpu() if dynamic else im,
-            f,
+            f0,
             verbose=False,
             opset_version=opset,
-            training=torch.onnx.TrainingMode.TRAINING if train else torch.onnx.TrainingMode.EVAL,
+            # training=torch.onnx.TrainingMode.TRAINING if train else torch.onnx.TrainingMode.EVAL,
             do_constant_folding=not train,
             input_names=['images'],
             output_names=['output'],
@@ -139,7 +140,7 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
             } if dynamic else None)
 
         # Checks
-        model_onnx = onnx.load(f)  # load onnx model
+        model_onnx = onnx.load(f0)  # load onnx model
         onnx.checker.check_model(model_onnx)  # check onnx model
 
         # Metadata
@@ -147,7 +148,7 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
         for k, v in d.items():
             meta = model_onnx.metadata_props.add()
             meta.key, meta.value = k, str(v)
-        onnx.save(model_onnx, f)
+        onnx.save(model_onnx, f0)
 
         # Simplify
         if simplify:
@@ -159,7 +160,7 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
                 LOGGER.info(f'{prefix} simplifying with onnx-simplifier {onnxsim.__version__}...')
                 model_onnx, check = onnxsim.simplify(model_onnx)
                 assert check, 'assert check failed'
-                onnx.save(model_onnx, f)
+                onnx.save(model_onnx, f0)
             except Exception as e:
                 LOGGER.info(f'{prefix} simplifier failure: {e}')
         LOGGER.info(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
@@ -612,5 +613,10 @@ def main(opt):
 
 
 if __name__ == "__main__":
+    sizes = [(352, 352), (416, 416), (480, 480)]
     opt = parse_opt()
-    main(opt)
+    for size in sizes:
+        opt.imgsz = size
+        if size[0]==480: opt.half = True
+
+        main(opt)
