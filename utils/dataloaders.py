@@ -602,13 +602,13 @@ class LoadImagesAndLabels(Dataset):
         if self.stronger.value > 0:
             if self.hyp['mosaic'] < 0.5:
                 self.hyp['mosaic'] = 0.5
-                # print('Stronger mosaic !!!')
+                print('Stronger mosaic !!!')
 
         if self.is_finetune.value > 0:
             if self.mosaic or self.augment:
                 self.mosaic = False
                 self.augment = False
-                # print('Disable augment from now !!!')
+                print('Disable augment from now !!!')
 
         hyp = self.hyp
         mosaic = self.mosaic and random.random() < hyp['mosaic']
