@@ -76,7 +76,30 @@ class Detect(nn.Module):
                     y = torch.cat((xy, wh, conf), 4)
                 z.append(y.view(bs, -1, self.no))
 
-        return x if self.training else (torch.cat(z, 1),) if self.export else (torch.cat(z, 1), x)
+        # custom output >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        if not self.training:
+            # [bs, 25200, 85]
+            origin_output = torch.cat(z, 1)
+            output_bboxes_nums = 1000
+            # operator argsort to ONNX opset version 12 is not supported.
+            # top_conf_index = origin_output[..., 4].argsort(descending=True)[:,:output_bboxes_nums]
+
+            # [bs, 1000]
+            top_conf_index = origin_output[..., 4].topk(k=output_bboxes_nums)[1]
+
+            # torch.Size([bs, 1000, 85])
+            filter_output = origin_output.gather(1, top_conf_index.unsqueeze(-1).expand(-1, -1, 85))
+
+            filter_output[...,5:] *= filter_output[..., 4].unsqueeze(-1)  # conf = obj_conf * cls_conf
+            bboxes =  filter_output[..., :4]
+            conf, cls_id = filter_output[..., 5:].max(2, keepdim=True)
+            # [bs, 1000, 6]
+            filter_output = torch.cat((bboxes, conf, cls_id.float()), 2)
+
+        return x if self.training else (filter_output,) if self.export else (filter_output, x)
+        # custom output >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+        # return x if self.training else (torch.cat(z, 1),) if self.export else (torch.cat(z, 1), x)
 
     def _make_grid(self, nx=20, ny=20, i=0, torch_1_10=check_version(torch.__version__, '1.10.0')):
         d = self.anchors[i].device
