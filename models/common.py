@@ -157,6 +157,50 @@ class C3(nn.Module):
         return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), 1))
 
 
+class C2(nn.Module):
+    # CSP Bottleneck with 2 convolutions
+    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+        super().__init__()
+        self.c = int(c2 * e)  # hidden channels
+        self.cv1 = Conv(c1, 2 * self.c, 1, 1)
+        self.cv2 = Conv(2 * self.c, c2, 1)  # optional act=FReLU(c2)
+        # self.attention = ChannelAttention(2 * self.c)  # or SpatialAttention()
+        # self.m = nn.Sequential(*(BottleneckNEW(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n)))
+        self.m = nn.Sequential(*(Bottleneck(self.c, self.c, shortcut, g, e=1.0) for _ in range(n)))
+
+    def forward(self, x):
+        a, b = self.cv1(x).split((self.c, self.c), 1)
+        return self.cv2(torch.cat((self.m(a), b), 1))
+
+
+class C2f(nn.Module):
+    # CSP Bottleneck with 2 convolutions
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+        super().__init__()
+        self.c = int(c2 * e)  # hidden channels
+        self.cv1 = Conv(c1, 2 * self.c, 1, 1)
+        self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
+        # self.m = nn.ModuleList(BottleneckNEW(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
+        self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, e=1.0) for _ in range(n))
+
+    def forward(self, x):
+        y = list(self.cv1(x).split((self.c, self.c), 1))
+        y.extend(m(y[-1]) for m in self.m)
+        return self.cv2(torch.cat(y, 1))
+
+
+class C1(nn.Module):
+    # CSP Bottleneck with 1 convolution
+    def __init__(self, c1, c2, n=1):  # ch_in, ch_out, number
+        super().__init__()
+        self.cv1 = Conv(c1, c2, 1, 1)
+        self.m = nn.Sequential(*(Conv(c2, c2, 3) for _ in range(n)))
+
+    def forward(self, x):
+        y = self.cv1(x)
+        return self.m(y) + y
+
+
 class C3x(C3):
     # C3 module with cross-convolutions
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):

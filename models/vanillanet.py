@@ -7,7 +7,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from timm.models.layers import weight_init, DropPath
+from timm.models.layers import DropPath
+from timm.models.layers import trunc_normal_
 import numpy as np
 
 __all__ = ['vanillanet_5', 'vanillanet_6', 'vanillanet_7', 'vanillanet_8', 'vanillanet_9', 'vanillanet_10', 'vanillanet_11', 'vanillanet_12', 'vanillanet_13', 'vanillanet_13_x1_5', 'vanillanet_13_x1_5_ada_pool']
@@ -21,7 +22,7 @@ class activation(nn.ReLU):
         self.bn = nn.BatchNorm2d(dim, eps=1e-6)
         self.dim = dim
         self.act_num = act_num
-        weight_init.trunc_normal_(self.weight, std=.02)
+        trunc_normal_(self.weight, std=.02)
 
     def forward(self, x):
         if self.deploy:
@@ -155,7 +156,7 @@ class VanillaNet(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, (nn.Conv2d, nn.Linear)):
-            weight_init.trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=.02)
             nn.init.constant_(m.bias, 0)
 
     def change_act(self, m):
@@ -222,14 +223,14 @@ def update_weight(model_dict, weight_dict):
     return model_dict
 
 def vanillanet_5(pretrained='',in_22k=False, **kwargs):
-    model = VanillaNet(dims=[128*4, 256*4, 512*4, 1024*4], strides=[2,2,2], **kwargs)
+    model = VanillaNet(dims=[32*4, 64*4, 128*4, 256*4], strides=[2,2,2], **kwargs)
     if pretrained:
         weights = torch.load(pretrained)['model_ema']
         model.load_state_dict(update_weight(model.state_dict(), weights))
     return model
 
 def vanillanet_6(pretrained='',in_22k=False, **kwargs):
-    model = VanillaNet(dims=[128*4, 256*4, 512*4, 1024*4, 1024*4], strides=[2,2,2,1], **kwargs)
+    model = VanillaNet(dims=[32, 64, 128, 256, 256], strides=[2,2,2,1], **kwargs)
     if pretrained:
         weights = torch.load(pretrained)['model_ema']
         model.load_state_dict(update_weight(model.state_dict(), weights))
