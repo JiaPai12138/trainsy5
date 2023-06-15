@@ -87,8 +87,8 @@ class Detect(nn.Module):
             # [bs, 1000]
             top_conf_index = origin_output[..., 4].topk(k=output_bboxes_nums)[1]
 
-            # torch.Size([bs, 1000, 85])
-            filter_output = origin_output.gather(1, top_conf_index.unsqueeze(-1).expand(-1, -1, 85))
+            # torch.Size([bs, 1000, 7])
+            filter_output = origin_output.gather(1, top_conf_index.unsqueeze(-1).expand(-1, -1, 7))
 
             filter_output[...,5:] *= filter_output[..., 4].unsqueeze(-1)  # conf = obj_conf * cls_conf
             bboxes =  filter_output[..., :4]
