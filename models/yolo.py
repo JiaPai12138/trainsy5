@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 if platform.system() != 'Windows':
     ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
+import timm
 from models.common import *
 from models.experimental import *
 from models.vanillanet import *
@@ -340,13 +341,13 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         n = n_ = max(round(n * gd), 1) if n > 1 else n  # depth gain
         if m in {
                 Conv, GhostConv, Bottleneck, GhostBottleneck, SPP, SPPF, DWConv, MixConv2d, Focus, CrossConv,
-                BottleneckCSP, C3, C2, C2f, C1, C3TR, C3SPP, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x}:
+                BottleneckCSP, C3, C3TR, C3SPP, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x}:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
                 c2 = make_divisible(c2 * gw, 8)
 
             args = [c1, c2, *args[1:]]
-            if m in {BottleneckCSP, C3, C2, C2f, C1, C3TR, C3Ghost, C3x}:
+            if m in {BottleneckCSP, C3, C3TR, C3Ghost, C3x}:
                 args.insert(2, n)  # number of repeats
                 n = 1
         elif m is nn.BatchNorm2d:
@@ -354,12 +355,10 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
         # TODO: channel, gw, gd
-        elif m in {Detect}:  # , Segment
+        elif m in {Detect}:
             args.append([ch[x] for x in f])
             if isinstance(args[1], int):  # number of anchors
                 args[1] = [list(range(args[1] * 2))] * len(f)
-            # if m is Segment:
-            #     args[3] = make_divisible(args[3] * gw, 8)
         elif m is Contract:
             c2 = ch[f] * args[0] ** 2
         elif m is Expand:
@@ -410,7 +409,7 @@ if __name__ == '__main__':
     device = select_device(opt.device)
 
     # Create model
-    im = torch.rand(opt.batch_size, 3, 640, 640).to(device)
+    im = torch.rand(opt.batch_size, 3, 416, 416).to(device)
     model = Model(opt.cfg).to(device)
 
     # Options
